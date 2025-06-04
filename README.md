@@ -1,4 +1,4 @@
-# AlphaForge(AFF)
+# AlphaForge-MAA(AFF-MAA)
 
 
 ### Data Preparation
@@ -15,11 +15,11 @@ The next, Modify the correspoding `/path/for/qlib_data` in `gan.utils.data.py` t
 
 #### stage1: Minning alpha factors
 ```shell
-python train_AFF.py --instruments=csi300 --train_end_year=2020 --seeds=[0,1,2,3,4] --save_name=test --zoo_size=100
+python train_AFF.py --instruments=all --train_end_year=2020 --seeds=[0,1,2,3,4] --save_name=test --zoo_size=100
 ```
 
 Here,
-- `instruments` is the dataset to use, e.g., `csi300`,`csi500`.
+- `instruments` is the dataset to use.
 - `seeds` is random seed list, e.g., `[0,1,2]` or `[0]`. 
 - `train_end_year` is the last year of training set, when train_end_year is 2020,the train,valid and test set is seperately: `2010-01-01 to 2020-12-31`,`2021-01-01 to 2021-12-31`,`2022-01-01 to 2022-12-31`
 - `save_name` is the prefix when saving running results. `zoo_size` is the num of factors to save at stage 1 mining model.
@@ -41,23 +41,6 @@ exp_AFF_calc_result.ipynb
 ```
 
 to generate and concat experiment result.
-
-
-### Run baseline experiments
-
-The experiment process of other models is similar to running our AFF model, Except that none of the other models have a combine step.
-
-#### GP:
-
-train: `train_RL.py`, show result: `exp_RL_calc_result.ipynb`
-
-#### RL:
-
-train: `train_RL.py`, show result: `exp_RL_calc_result.ipynb`
-
-#### DSO:
-
-train: `train_RL.py`, show result: `exp_RL_calc_result.ipynb`
 
 #### ML models including XGBoost, LightGBM and MLP:
 
