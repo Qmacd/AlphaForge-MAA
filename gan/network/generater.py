@@ -363,29 +363,75 @@ def train_multi_agent_generator(netGs, netM, netP, netDs, cfg, data, target,
         for optG in optGs:
             optG.step()
 
-        # 蒸馏逻辑（可选）
+        # 蒸馏
         if epoch % 10 == 0 and cfg.distill:
-            score_arr = [np.mean(b.scores) for b in blds_list]
+            with torch.no_grad():
+                score_arr = [np.mean(b.scores) if len(b.scores) > 0 else -float('inf') for b in blds_list]
+
+            # 确保有有效分数
+            valid_scores = [s for s in score_arr if s != -float('inf')]
+            if len(valid_scores) < 2:
+                continue
+
             rank = np.argsort(score_arr)[::-1]
-            teacher_logits = logits_list[rank[0]].detach()
-            student_logits = logits_list[rank[-1]]
-            soft_loss = F.kl_div(F.log_softmax(student_logits, dim=-1),
-                                 F.softmax(teacher_logits, dim=-1), reduction='batchmean')
-            optGs[rank[-1]].zero_grad()
-            soft_loss.backward()
-            optGs[rank[-1]].step()
+            teacher_idx, student_idx = rank[0], rank[-1]
+
+            # 如果教师和学生是同一个，跳过
+            if teacher_idx == student_idx:
+                continue
+
+            try:
+                # 重新生成用于蒸馏的输入
+                z_teacher = random_method(torch.zeros(cfg.batch_size, cfg.potential_size).to(cfg.device))
+                z_student = random_method(torch.zeros(cfg.batch_size, cfg.potential_size).to(cfg.device))
+
+                with torch.no_grad():
+                    teacher_logits = netGs[teacher_idx](z_teacher)
+
+                student_logits = netGs[student_idx](z_student)
+
+                # 计算蒸馏损失
+                soft_loss = distill_step(student_logits, teacher_logits, temperature=2.0)
+
+                # 优化学生模型
+                optGs[student_idx].zero_grad()
+                soft_loss.backward()
+                optGs[student_idx].step()
+
+            except Exception as e:
+                print(f"Distillation failed at epoch {epoch}: {e}")
+                continue
 
         # Cross Finetune 判别器
         if epoch % 10 == 0 and cfg.cross_finetune:
-            i, j = np.random.choice(N, 2, replace=False)
-            netDs[j].train()
-            netGs[i].train()
-            fake_input = onehot_list[i].view(onehot_list[i].size(0), -1)
-            out = netDs[j](fake_input)
-            loss_cross = F.binary_cross_entropy(out, torch.ones_like(out))
-            optDs[j].zero_grad()
-            loss_cross.backward()
-            optDs[j].step()
+            try:
+                i, j = np.random.choice(N, 2, replace=False)
+
+                # 重新生成数据，避免使用已经参与梯度计算的数据
+                with torch.no_grad():
+                    z_new = random_method(torch.zeros(cfg.batch_size, cfg.potential_size).to(cfg.device))
+                    logit_new = netGs[i](z_new)
+                    masked_x_new, _, _ = netM(logit_new)
+                    onehot_new = F.gumbel_softmax(masked_x_new, hard=True)
+
+                # 用新数据训练判别器
+                netDs[j].train()
+                netGs[i].eval()  # 固定生成器
+
+                fake_input = onehot_new.view(onehot_new.size(0), -1).detach()
+                out = netDs[j](fake_input)
+
+                # 判别器希望把假数据识别为假(0)，但这里是对抗训练，所以用1
+                real_label = torch.ones_like(out).to(cfg.device)
+                loss_cross = F.binary_cross_entropy_with_logits(out, real_label)
+
+                optDs[j].zero_grad()
+                loss_cross.backward()
+                optDs[j].step()
+
+            except Exception as e:
+                print(f"Cross finetune failed at epoch {epoch}: {e}")
+                continue
 
         # Early stopping 逻辑
         avg_scores = [np.mean(b.scores) for b in blds_list]
@@ -418,3 +464,23 @@ def train_multi_agent_generator(netGs, netM, netP, netDs, cfg, data, target,
 
     merged_blds.drop_duplicated()
     return merged_blds
+
+
+def distill_step(student_logits, teacher_logits, temperature=1.0):
+    """蒸馏损失计算"""
+    # 确保维度一致
+    if student_logits.shape != teacher_logits.shape:
+        print(f"Shape mismatch: student {student_logits.shape}, teacher {teacher_logits.shape}")
+        return torch.tensor(0.0, device=student_logits.device, requires_grad=True)
+
+    # 教师输出需要detach
+    teacher_logits = teacher_logits.detach()
+
+    # 温度软化
+    teacher_softmax = F.softmax(teacher_logits / temperature, dim=-1)
+    student_logsoftmax = F.log_softmax(student_logits / temperature, dim=-1)
+
+    # KL散度损失
+    distillation_loss = F.kl_div(student_logsoftmax, teacher_softmax, reduction='batchmean')
+
+    return distillation_loss
