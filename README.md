@@ -1,16 +1,5 @@
 # AlphaForge-MAA(AFF-MAA)
 
-
-### Data Preparation
-Similar to [AlphaGen](https://github.com/RL-MLDM/alphagen), We Use [Qlib](https://github.com/microsoft/qlib#data-preparation) as data save tool and download data from free & open-source data source  [baostock](http://baostock.com/baostock/index.php/%E9%A6%96%E9%A1%B5).
-
-Please install Qlib [Qlib](https://github.com/microsoft/qlib) first
-
-Then download stock data through running `data_collection/fetch_baostock_data.py`
-
-The next, Modify the correspoding `/path/for/qlib_data` in `gan.utils.data.py` to the data you downloaded (the dafault setting is `~/.qlib/qlib_data/cn_data_rolling`)
-
-
 ### Run Our Model
 
 #### stage1: Minning alpha factors
@@ -45,6 +34,9 @@ to generate and concat experiment result.
 #### ML models including XGBoost, LightGBM and MLP:
 
 train & show results: `exp_ML_train_and_result.ipynb`
+
+#### attention
+version of cuda maybe more than 11.3
 
 
 
