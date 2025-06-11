@@ -36,7 +36,7 @@ to generate and concat experiment result.
 train & show results: `exp_ML_train_and_result.ipynb`
 
 #### attention
-version of cuda maybe more than 11.3
+version of cuda maybe more than 11.3 (recommend torch 1.11 + cuda 11.3)
 
 
 
