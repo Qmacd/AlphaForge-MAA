@@ -4,7 +4,7 @@
 
 #### stage1: Minning alpha factors
 ```shell
-python train_AFF.py --instruments=all --train_end_year=2020 --seeds=[0,1,2,3,4] --save_name=test --zoo_size=100
+python train_AFF.py --instruments=all --train_end_year=2020 --seeds=[0,1,2,3,4] --save_name=test --zoo_size=20 --is_use_multi_agent=True --is_distill=True --is_cross_finetune=True
 ```
 
 Here,
